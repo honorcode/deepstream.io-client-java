@@ -14,93 +14,267 @@ class UtilJSONPath {
     }
 
     /**
-     * Traverses through the json element tree for retrieving values
+     * Traverses through the json this.coreElement tree for retrieving values
      *
-     * @param element The element to traverse through
      * @param path The path to find
-     * @return The element indicated by the path
+     * @return The element found indicated by the path
      */
-    private static JsonElement getIterateThrough(JsonElement element, String path) {
-        String[] st = path.split( "\\." );
-        JsonElement traverser = element;
+    private JsonElement getIterateThrough(String path) {
+
+        if (path == null || path.trim().isEmpty() ) {
+            return this.coreElement;
+        }
+
+        String p = path.replaceAll("\\s","");
+        p = p.replaceAll("\\[(.*?)\\]", ".=$1");
+        String[] pathTokens = p.split( "\\." );
+
+        int index = -1;
+        JsonElement traverser = this.coreElement;
         String token = null;
+        int i = 0;
 
-        for( int i=0; i < st.length; i++ ) {
-            token = st[i];
-            try {
-                if (traverser.isJsonNull()) {
-                    break;
-                }
+        for( i = 0; i < pathTokens.length; i++ ) {
 
-                if (isArray(token)) {
-                    String prefix = getTokenPrefix(token);
-                    int index = Integer.parseInt( getIndex( token ) );
-                    traverser = traverser.getAsJsonObject().get(prefix).getAsJsonArray().get(index);
-                } else if (traverser.isJsonObject()) {
-                    traverser = traverser.getAsJsonObject().get(token);
-                } else if (traverser.isJsonArray()) {
-                    break;
-                }
-            } catch( IndexOutOfBoundsException e ) {
+            token = pathTokens[ i ];
+            if ( token.trim().isEmpty() ) {
+                // root obj is a JsonArray and path starts with '[2]' parses to '.=2' and .splits into two parts: the first part is empty string
+                continue;
+            }
+
+            // tokens can only be either
+            // 1) array index elements
+            // 2) object members
+
+            if ( traverser == null || traverser.isJsonNull() ) {
                 return null;
-            } catch( NullPointerException e ) {
+            }
+
+            try {
+                index = getArrayToken( token  );
+                Boolean isArrayToken = ( index != -1 ) ? true : false;
+
+                if ( isArrayToken ) {
+
+                    if ( !traverser.isJsonArray() ) {
+                        return null;
+                    }
+                    traverser = traverser.getAsJsonArray().get( index );
+
+                } else if ( traverser.isJsonObject() ) {
+
+                    traverser = traverser.getAsJsonObject().get( token );
+
+                } else if ( traverser.isJsonArray() ) {
+
+                    // TODO: @honorcode
+                    // TODO: err condition -> have a token that is not an arrayToken and the current element to traverse is an JsonArray - mismatch, bad path ?
+                    // TODO: @honorcode - err? Shouldn't happen unless bad access path
+                    // TODO: that doesn't match the model, err?
+                    return null;
+
+                } else {
+
+                    // TODO: @honorcode - this code branch should NOT be a reachable condition anymore but if not (bug?) ..... do what?
+                    // TODO: @honorcode - err handler ?, logger ?, throw exception ?
+                    return null; // TODO: @honorcode - remove 'else' ????
+                }
+
+            } catch ( Exception e ) {
+
                 return null;
             }
         }
+
         return traverser;
     }
 
-    private static JsonElement setIterateThrough (JsonElement element, String path, JsonElement value, boolean delete) {
-        String[] st = path.split( "\\." );
-        JsonElement traverser = element;
-        JsonElement parent = null;
-        String token = null;
+    /* sync logic with that in deepstream.io server source json-path.js
 
-        for( int i=0; i<st.length; i++ ) {
-            token = st[ i ];
-            parent = traverser;
-            if (traverser.isJsonNull()) {
-                break;
+      // TODO: @honorcode - should now refactor deepstream.io json-path.js to match this parser and logic
+      // TODO: REMINDER update json-path.js for '.' update in: str = str.replace(/\[(.*?)\]/g, '=$1') ====>>> str = str.replace(/\[(.*?)\]/g, '.=$1')
+
+      // makes json path array items a single 'part' value of parts below
+      // 'arrayProp[#]' members transform to 'arrayProp=#' now instead of 'arrayProp.#' previously
+      // see setValue fnc above for special handling of array item parsing vs numeric obj member name
+      // e.g. 'object.1' parsing. this allows for support of parsing and differentiating object
+      // member names that are also numeric values
+      // also supports multi-dimensional arrays e.g. arr[0][1][2][3]... => arr=0=1=2=3...
+      let str = this._path.replace(/\s/g, '')
+      str = str.replace(/\[(.*?)\]/g, '=$1')
+      const SPLIT_REG_EXP = /[.[\]]/g
+      const parts = str.split(SPLIT_REG_EXP)
+
+    */
+
+    // @honorcode
+    // the intent in the logic updates below and above in getIterateThrough
+    // is to consistently support json path tokens having
+    // numeric object member names (e.g. abc.1.xyz.4) and
+    // multi-dim arrays (e.g. array[0][1][2][3])
+    // with regex parsing and rules that match the
+    // deepstream.io server json-path.js parser logic
+
+    private void setIterateThrough (String path, JsonElement value, boolean delete) {
+
+        if (path == null || path.trim().isEmpty() ) {
+            return;
+        }
+
+        String p = path.replaceAll("\\s","");
+        p = p.replaceAll("\\[(.*?)\\]", ".=$1");
+        String[] pathTokens = p.split( "\\." );
+
+        // check and if necessary init the root/parent JsonElement type
+        // if first token is array index (e.g. [1] parsed to ".=1")
+        // then force element to be a JsonArray if it is not
+        // likewise
+        // if first token is not an array index
+        // then force element to be a JsonObject if it is not
+        int index = -1;
+        if ( pathTokens[0].trim().isEmpty() ) {
+            if ( !this.coreElement.isJsonArray() ) {
+                this.coreElement = new JsonArray();
             }
-
-            if (isArray(token)) {
-                String prefix = getTokenPrefix(token);
-                token = getIndex( token );
-                int index = Integer.parseInt( token );
-                JsonObject parentObject = traverser.getAsJsonObject();
-                if( parentObject.get(prefix) == null ) {
-                    parentObject.add( prefix, initialiseArray(index) );
-                }
-                try {
-                    parentObject.get( prefix ).getAsJsonArray().get( index );
-                } catch( IndexOutOfBoundsException e ) {
-                    extendArray( parentObject.get( prefix ).getAsJsonArray(), index );
-                }
-                parent = parentObject.get( prefix );
-                if (parentObject.get( prefix ).getAsJsonArray().get( index ).isJsonNull()) {
-                    parentObject.get( prefix ).getAsJsonArray().set( index, new JsonObject() );
-                }
-                traverser = parentObject.get( prefix ).getAsJsonArray().get( index );//traverser.getAsJsonObject().get( prefix );
-            } else if( traverser.isJsonObject() ) {
-                JsonElement property = traverser.getAsJsonObject().get(token);
-                if (property == null) {
-                    traverser.getAsJsonObject().add(token, new JsonObject());
-                }
-                parent = traverser.getAsJsonObject();
-                traverser = traverser.getAsJsonObject().get(token);
-
-            } else if( traverser.isJsonArray() ){
-                break;
+        } else {
+            if ( !this.coreElement.isJsonObject() ) {
+                this.coreElement = new JsonObject();
             }
         }
 
-        if( token != null && (value != null || delete) ) {
+        JsonElement traverser = this.coreElement;
+        JsonElement parent = this.coreElement;
+        String token = null;
+        int i = 0;
+
+        for( i = 0; i < pathTokens.length; i++ ) {
+
+            Boolean lastPathToken = ( i == ( pathTokens.length - 1 ) );
+
+            token = pathTokens[ i ];
+            if ( token.trim().isEmpty() ) {
+                // root obj is a JsonArray and path starts with '[2]' parses to '.=2' and .splits into two parts: the first part is empty string
+                continue;
+            }
+            parent = traverser;
+
+            // if there are more path tokens to traverse (!lastPathToken)
+            // then peek ahead and force the nextPathToken
+            // to be the proper type (array/object)
+            // if it doesn't exist then create it,
+            // if it exists but is not the expected type
+            // then overwrite the existing instance with
+            // the expected instance type (array/object)
+            // if it exists and is the correct type traverse into it
+
+            // tokens can only be either
+            // 1) array index elements
+            // 2) object members
+
+
+            index = getArrayToken( token  );
+            Boolean isArrayToken = ( index != -1 ) ? true : false;
+
+            if ( isArrayToken ) {
+
+                try {
+                    traverser.getAsJsonArray().get( index );
+                } catch ( IndexOutOfBoundsException e ) {
+                    extendArray( traverser.getAsJsonArray(), index );
+                }
+
+                JsonElement arrayElem = traverser.getAsJsonArray().get( index );
+                if ( !lastPathToken ) {
+
+                    // there are more path tokens to traverse
+                    // so peek ahead and force the nextPathToken
+                    // to be the proper type (array/object)
+                    // if it doesn't exist then create it,
+                    // if it exists but is not the expected type
+                    // then overwrite the existing instance with
+                    // the expected instance type (array/object)
+
+                    String nextPathToken = pathTokens[ i + 1 ];
+
+                    if ( nextPathToken.contains("=") ) {
+                        // nextPathToken expected to be an array
+                        if ( arrayElem == null || arrayElem == JsonNull.INSTANCE || !arrayElem.isJsonArray() ) {
+                            traverser.getAsJsonArray().set( index, new JsonArray() );
+                            arrayElem = traverser.getAsJsonArray().get( index );
+                        }
+                        parent = traverser.getAsJsonArray();
+                        traverser = arrayElem.getAsJsonArray();
+
+                    } else {
+                        // nextPathToken expected to be an object
+                        if ( arrayElem == null || arrayElem == JsonNull.INSTANCE || !arrayElem.isJsonObject() ) {
+                            traverser.getAsJsonArray().set( index, new JsonObject() );
+                            arrayElem = traverser.getAsJsonArray().get( index );
+                        }
+                        parent = traverser.getAsJsonArray();
+                        traverser = arrayElem.getAsJsonObject();
+                    }
+
+                } else {
+
+                    // this is the last token in path
+                    parent = traverser.getAsJsonArray();
+                    traverser = arrayElem;
+                    // reset token value to last array index for updateValue(..) arg use below
+                    // when use case is this array index part is the last token in the path
+                    token = String.valueOf( index );
+                }
+
+            } else if ( traverser.isJsonObject() ) {
+
+                JsonElement objMember = traverser.getAsJsonObject().get( token );
+                if ( !lastPathToken ) {
+
+                    String nextPathToken = pathTokens[ i + 1 ];
+
+                    if ( nextPathToken.contains("=") ) {
+                        // nextPathToken expected to be an array
+                        if ( objMember == null || objMember == JsonNull.INSTANCE || !objMember.isJsonArray() ) {
+                            traverser.getAsJsonObject().add( token, new JsonArray() );
+                            objMember = traverser.getAsJsonObject().get( token );
+                        }
+                        parent = traverser.getAsJsonObject();
+                        traverser = objMember.getAsJsonArray();
+                    } else {
+                        // nextPathToken expected to be an object
+                        if ( objMember == null || objMember == JsonNull.INSTANCE || !objMember.isJsonObject() ) {
+                            traverser.getAsJsonObject().add( token, new JsonObject() );
+                            objMember = traverser.getAsJsonObject().get( token );
+                        }
+                        parent = traverser.getAsJsonObject();
+                        traverser = objMember.getAsJsonObject();
+                    }
+
+                } else {
+
+                    // this is the last token in path
+                    parent = traverser.getAsJsonObject();
+                    traverser = objMember;
+                }
+            } else {
+
+                // TODO: @honorcode - this code branch should NOT be a reachable condition anymore but if not (bug?) ..... do what?
+                // TODO: @honorcode - err handler ?, logger ?, throw exception ?
+                break; // TODO: @honorcode - remove 'else' ????
+            }
+        }
+
+        if( ( parent.isJsonObject() || parent.isJsonArray() ) &&
+            ( token != null ) &&
+            ( value != null || delete ) ) {
+
             updateValue(value, parent, token, delete);
         }
-        return traverser;
+
+        return;
     }
 
-    private static JsonArray initialiseArray(int size) {
+    private JsonArray initialiseArray(int size) {
         JsonArray array = new JsonArray();
         for (int j = 0; j < size; j++) {
             array.add(JsonNull.INSTANCE);
@@ -110,7 +284,7 @@ class UtilJSONPath {
         return array;
     }
 
-    private static void extendArray(JsonArray array, int size) {
+    private void extendArray(JsonArray array, int size) {
         for (int j = array.size(); j < size; j++) {
             array.add(JsonNull.INSTANCE);
         }
@@ -118,7 +292,7 @@ class UtilJSONPath {
         array.add(temp);
     }
 
-    private static void updateValue(JsonElement value, JsonElement parent, String token, boolean delete) {
+    private void updateValue(JsonElement value, JsonElement parent, String token, boolean delete) {
         if( parent.isJsonObject() ) {
             JsonObject object = (JsonObject) parent;
             if( delete ) {
@@ -143,8 +317,8 @@ class UtilJSONPath {
         }
     }
 
-    private static JsonElement getArrayElement(JsonElement traverser,
-                                               String token) {
+    // TODO: honorcode->alex question: this appears to never be used ?
+    private JsonElement getArrayElement(JsonElement traverser, String token) {
 
         int index =  Integer.valueOf( getIndex(token) );
         try {
@@ -158,21 +332,28 @@ class UtilJSONPath {
         }
     }
 
-    private static String getTokenPrefix(String token) {
+    private String getTokenPrefix(String token) {
         return token.substring( 0, token.indexOf( "[" ) );
     }
 
-    private static String getIndex(String token) {
+    private String getIndex(String token) {
         return token.substring(token.indexOf("[") + 1, token.indexOf("]")).trim();
     }
 
-    private static boolean isArray(String token) {
-        boolean isArray = ( token.contains("[") && token.contains("]") && (token.indexOf("[") < token.indexOf("]")));
+    private int getArrayToken(String token) {
+        // array tokens of path are expected to be parsed into
+        // e.g. '=1' parsed from '[1]' or 'arr.=1' parsed into 2 separate tokens 'arr','=1'
+        boolean isArray = token.startsWith("=");
+        if (!isArray) return -1;
         try {
-            Integer.parseInt( token.substring(token.indexOf("[")+1, token.indexOf("]") ).trim() );
-            return isArray;
+            String[] arrayTokenParts = token.split("=");
+            int index = (Integer) Integer.parseInt( arrayTokenParts[ 1 ] );
+            if ( index >= 0 ) {
+                return index;
+            }
+            return -1;
         } catch (Exception e) {
-            return false;
+            return -1;
         }
     }
 
@@ -180,7 +361,7 @@ class UtilJSONPath {
         if (Objects.equals(path, "") || path == null) {
             return this.coreElement;
         } else {
-            return getIterateThrough(this.coreElement, path);
+            return getIterateThrough(path);
         }
     }
 
@@ -190,7 +371,7 @@ class UtilJSONPath {
         } else if (path == null) {
             this.coreElement = value;
         } else {
-            setIterateThrough(this.coreElement, path, value, false);
+            setIterateThrough(path, value, false);
         }
     }
 
@@ -203,7 +384,7 @@ class UtilJSONPath {
      * @param path The path to delete
      */
     protected void delete(String path) {
-        setIterateThrough(this.coreElement, path, null, true);
+        setIterateThrough(path, null, true);
     }
 
     public JsonElement getCoreElement() {
@@ -214,6 +395,8 @@ class UtilJSONPath {
         this.coreElement = coreElement;
     }
 
+
+    // TODO: honorcode->alex question: this appears to never be used ?
     public class Array implements Iterable<UtilJSONPath> {
         private final JsonArray root;
         private JsonElement coreElement;

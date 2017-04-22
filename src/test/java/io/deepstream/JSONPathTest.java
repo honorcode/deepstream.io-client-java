@@ -187,35 +187,6 @@ public class JSONPathTest {
     };
 
     @Test
-    public void handlesComplexRootArrayOfArrays() {
-
-        JsonPrimitive value = new JsonPrimitive("VALUE");
-
-        jsonPath3.setCoreElement(new JsonObject());
-        System.out.println("handlesComplexArraysOfArrays OK = " + jsonPath3.getCoreElement().toString());
-
-        jsonPath3.set("[0][2]", value);
-        Assert.assertEquals(
-            value,
-            jsonPath3.get("[0][2]")
-        );
-        System.out.println("handlesComplexArraysOfArrays OK = " + jsonPath3.getCoreElement().toString());
-
-        jsonPath3.set("[0][2]", jsonArrayOfArrayObj);
-        Assert.assertEquals(
-            jsonArrayOfArrayObj,
-            jsonPath3.get("[0][2]")
-        );
-        System.out.println("handlesComplexArraysOfArrays OK = " + jsonPath3.getCoreElement().toString());
-
-        Assert.assertEquals(
-            value,
-            jsonPath3.get("[0][2][1][1]")
-        );
-        System.out.println("handlesComplexArraysOfArrays OK = " + jsonPath3.getCoreElement().toString());
-    };
-
-    @Test
     public void handlesComplexSetArraysOfArraysValue() {
 
         jsonPath3.set("arrOfArr", jsonArrayOfArrayObj);
@@ -225,18 +196,6 @@ public class JSONPathTest {
         );
         //System.out.println("handlesComplexSetArraysOfArraysValue OK = " + jsonPath3.getCoreElement().toString());
     };
-
-    @Test
-    public void handlesComplexSetRootArrayOfArraysValue() {
-
-        jsonPath3.set("[1]", jsonArrayOfArrayObj);
-        Assert.assertEquals(
-            jsonArrayOfArrayObj,
-            jsonPath3.get("[1]")
-        );
-        //System.out.println("handlesComplexSetArraysOfArraysValue OK = " + jsonPath3.getCoreElement().toString());
-    };
-
 
     /**
      * Set

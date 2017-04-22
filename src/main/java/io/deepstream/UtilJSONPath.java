@@ -14,33 +14,47 @@ class UtilJSONPath {
     }
 
     /**
-     * Traverses through the json this.coreElement tree for retrieving values
+     * Traverses through the json element tree for retrieving values
      *
+     * @param element The element to traverse through
      * @param path The path to find
-     * @return The element found indicated by the path
+     * @return The element indicated by the path
      */
-    private JsonElement getIterateThrough(String path) {
+    private static JsonElement getIterateThrough(JsonElement element, String path) {
 
         if (path == null || path.trim().isEmpty() ) {
-            return this.coreElement;
+            return element;
         }
 
         String p = path.replaceAll("\\s","");
         p = p.replaceAll("\\[(.*?)\\]", ".=$1");
         String[] pathTokens = p.split( "\\." );
 
+        // check and if necessary init the root/parent JsonElement type
+        // if first token is array index (e.g. [1] parsed to ".=1")
+        // then return without update because
+        // DS records must be a root JsonObject,
+        // so do NOT support paths that expect root level to be a JsonArray,
+        // root must be JsonObject
+        //
+        // also if first token is not an array index and the root element
+        // is not already defined to be a JsonObject this is an
+        // error condition too, just return without updating
+        if ( pathTokens[0].trim().isEmpty() ) {
+            // DS records must be a root JsonObject, so do NOT support paths that expect root level to be a JsonArray, root must be JsonObject
+            return null;
+        } else if ( !element.isJsonObject() ) {
+            return null;
+        }
+
         int index = -1;
-        JsonElement traverser = this.coreElement;
+        JsonElement traverser = element;
         String token = null;
         int i = 0;
 
         for( i = 0; i < pathTokens.length; i++ ) {
 
             token = pathTokens[ i ];
-            if ( token.trim().isEmpty() ) {
-                // root obj is a JsonArray and path starts with '[2]' parses to '.=2' and .splits into two parts: the first part is empty string
-                continue;
-            }
 
             // tokens can only be either
             // 1) array index elements
@@ -91,8 +105,10 @@ class UtilJSONPath {
 
     /* sync logic with that in deepstream.io server source json-path.js
 
+      // TODO: **************************************************************************************************************************************************
       // TODO: @honorcode - should now refactor deepstream.io json-path.js to match this parser and logic
       // TODO: REMINDER update json-path.js for '.' update in: str = str.replace(/\[(.*?)\]/g, '=$1') ====>>> str = str.replace(/\[(.*?)\]/g, '.=$1')
+      // TODO: **************************************************************************************************************************************************
 
       // makes json path array items a single 'part' value of parts below
       // 'arrayProp[#]' members transform to 'arrayProp=#' now instead of 'arrayProp.#' previously
@@ -101,7 +117,7 @@ class UtilJSONPath {
       // member names that are also numeric values
       // also supports multi-dimensional arrays e.g. arr[0][1][2][3]... => arr=0=1=2=3...
       let str = this._path.replace(/\s/g, '')
-      str = str.replace(/\[(.*?)\]/g, '=$1')
+      str = str.replace(/\[(.*?)\]/g, '.=$1')
       const SPLIT_REG_EXP = /[.[\]]/g
       const parts = str.split(SPLIT_REG_EXP)
 
@@ -115,7 +131,7 @@ class UtilJSONPath {
     // with regex parsing and rules that match the
     // deepstream.io server json-path.js parser logic
 
-    private void setIterateThrough (String path, JsonElement value, boolean delete) {
+    private static void setIterateThrough (JsonElement element, String path, JsonElement value, boolean delete) {
 
         if (path == null || path.trim().isEmpty() ) {
             return;
@@ -127,23 +143,24 @@ class UtilJSONPath {
 
         // check and if necessary init the root/parent JsonElement type
         // if first token is array index (e.g. [1] parsed to ".=1")
-        // then force element to be a JsonArray if it is not
-        // likewise
-        // if first token is not an array index
-        // then force element to be a JsonObject if it is not
-        int index = -1;
+        // then return without update because
+        // DS records must be a root JsonObject,
+        // so do NOT support paths that expect root level to be a JsonArray,
+        // root must be JsonObject
+        //
+        // also if first token is not an array index and the root element
+        // is not already defined to be a JsonObject this is an
+        // error condition too, just return without updating
         if ( pathTokens[0].trim().isEmpty() ) {
-            if ( !this.coreElement.isJsonArray() ) {
-                this.coreElement = new JsonArray();
-            }
-        } else {
-            if ( !this.coreElement.isJsonObject() ) {
-                this.coreElement = new JsonObject();
-            }
+            // DS records must be a root JsonObject, so do NOT support paths that expect root level to be a JsonArray, root must be JsonObject
+            return;
+        } else if ( !element.isJsonObject() ) {
+            return;
         }
 
-        JsonElement traverser = this.coreElement;
-        JsonElement parent = this.coreElement;
+        int index = -1;
+        JsonElement traverser = element;
+        JsonElement parent = element;
         String token = null;
         int i = 0;
 
@@ -152,10 +169,6 @@ class UtilJSONPath {
             Boolean lastPathToken = ( i == ( pathTokens.length - 1 ) );
 
             token = pathTokens[ i ];
-            if ( token.trim().isEmpty() ) {
-                // root obj is a JsonArray and path starts with '[2]' parses to '.=2' and .splits into two parts: the first part is empty string
-                continue;
-            }
             parent = traverser;
 
             // if there are more path tokens to traverse (!lastPathToken)
@@ -274,7 +287,7 @@ class UtilJSONPath {
         return;
     }
 
-    private JsonArray initialiseArray(int size) {
+    private static JsonArray initialiseArray(int size) {
         JsonArray array = new JsonArray();
         for (int j = 0; j < size; j++) {
             array.add(JsonNull.INSTANCE);
@@ -284,7 +297,7 @@ class UtilJSONPath {
         return array;
     }
 
-    private void extendArray(JsonArray array, int size) {
+    private static void extendArray(JsonArray array, int size) {
         for (int j = array.size(); j < size; j++) {
             array.add(JsonNull.INSTANCE);
         }
@@ -292,7 +305,7 @@ class UtilJSONPath {
         array.add(temp);
     }
 
-    private void updateValue(JsonElement value, JsonElement parent, String token, boolean delete) {
+    private static void updateValue(JsonElement value, JsonElement parent, String token, boolean delete) {
         if( parent.isJsonObject() ) {
             JsonObject object = (JsonObject) parent;
             if( delete ) {
@@ -318,7 +331,7 @@ class UtilJSONPath {
     }
 
     // TODO: honorcode->alex question: this appears to never be used ?
-    private JsonElement getArrayElement(JsonElement traverser, String token) {
+    private static JsonElement getArrayElement(JsonElement traverser, String token) {
 
         int index =  Integer.valueOf( getIndex(token) );
         try {
@@ -332,15 +345,15 @@ class UtilJSONPath {
         }
     }
 
-    private String getTokenPrefix(String token) {
+    private static String getTokenPrefix(String token) {
         return token.substring( 0, token.indexOf( "[" ) );
     }
 
-    private String getIndex(String token) {
+    private static String getIndex(String token) {
         return token.substring(token.indexOf("[") + 1, token.indexOf("]")).trim();
     }
 
-    private int getArrayToken(String token) {
+    private static int getArrayToken(String token) {
         // array tokens of path are expected to be parsed into
         // e.g. '=1' parsed from '[1]' or 'arr.=1' parsed into 2 separate tokens 'arr','=1'
         boolean isArray = token.startsWith("=");
@@ -361,7 +374,7 @@ class UtilJSONPath {
         if (Objects.equals(path, "") || path == null) {
             return this.coreElement;
         } else {
-            return getIterateThrough(path);
+            return getIterateThrough(this.coreElement, path);
         }
     }
 
@@ -371,7 +384,7 @@ class UtilJSONPath {
         } else if (path == null) {
             this.coreElement = value;
         } else {
-            setIterateThrough(path, value, false);
+            setIterateThrough(this.coreElement, path, value, false);
         }
     }
 
@@ -384,7 +397,7 @@ class UtilJSONPath {
      * @param path The path to delete
      */
     protected void delete(String path) {
-        setIterateThrough(path, null, true);
+        setIterateThrough(this.coreElement, path, null, true);
     }
 
     public JsonElement getCoreElement() {

@@ -170,20 +170,17 @@ public class JSONPathTest {
             value,
             jsonPath3.get("arrOfArr[0][2]")
         );
-        //System.out.println("handlesComplexArraysOfArrays OK = " + jsonPath3.getCoreElement().toString());
 
         jsonPath3.set("arrOfArr[0][2]", jsonArrayOfArrayObj);
         Assert.assertEquals(
             jsonArrayOfArrayObj,
             jsonPath3.get("arrOfArr[0][2]")
         );
-        //System.out.println("handlesComplexArraysOfArrays OK = " + jsonPath3.getCoreElement().toString());
 
         Assert.assertEquals(
             value,
             jsonPath3.get("arrOfArr[0][2][1][1]")
         );
-        //System.out.println("handlesComplexArraysOfArrays OK = " + jsonPath3.getCoreElement().toString());
     };
 
     @Test
@@ -194,7 +191,6 @@ public class JSONPathTest {
             jsonArrayOfArrayObj,
             jsonPath3.get("arrOfArr")
         );
-        //System.out.println("handlesComplexSetArraysOfArraysValue OK = " + jsonPath3.getCoreElement().toString());
     };
 
     /**

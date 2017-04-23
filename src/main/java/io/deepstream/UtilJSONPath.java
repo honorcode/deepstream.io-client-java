@@ -103,19 +103,16 @@ class UtilJSONPath {
         return traverser;
     }
 
-    /* sync logic with that in deepstream.io server source json-path.js
-
-      // TODO: **************************************************************************************************************************************************
-      // TODO: @honorcode - should now refactor deepstream.io json-path.js to match this parser and logic
-      // TODO: REMINDER update json-path.js for '.' update in: str = str.replace(/\[(.*?)\]/g, '=$1') ====>>> str = str.replace(/\[(.*?)\]/g, '.=$1')
-      // TODO: **************************************************************************************************************************************************
+    /* sync'd logic with that in deepstream.io server source json-path.js
 
       // makes json path array items a single 'part' value of parts below
       // 'arrayProp[#]' members transform to 'arrayProp=#' now instead of 'arrayProp.#' previously
       // see setValue fnc above for special handling of array item parsing vs numeric obj member name
       // e.g. 'object.1' parsing. this allows for support of parsing and differentiating object
       // member names that are also numeric values
-      // also supports multi-dimensional arrays e.g. arr[0][1][2][3]... => arr=0=1=2=3...
+      // also supports multi-dimensional arrays e.g. arr[0][1][2][3]... => arr.=0.=1.=2.=3...
+      // note: array index tokens are prefixed from regex with a '=' e.g. .=0.=1.=2 compared with
+      // numeric obj field names tokens which are just .0.1.2.3
       let str = this._path.replace(/\s/g, '')
       str = str.replace(/\[(.*?)\]/g, '.=$1')
       const SPLIT_REG_EXP = /[.[\]]/g

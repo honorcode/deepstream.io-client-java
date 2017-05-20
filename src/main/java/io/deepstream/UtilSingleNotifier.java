@@ -16,6 +16,7 @@ class UtilSingleNotifier implements UtilResubscribeNotifier.UtilResubscribeListe
     private final IConnection connection;
     private final Map<String, ArrayList<UtilSingleNotifierCallback> > requests;
     private final UtilAckTimeoutRegistry ackTimeoutRegistry;
+    private final UtilResubscribeNotifier utilResubscribeNotifier;
 
     /**
      * Provides a scaffold for subscriptionless requests to io.deepstream.gherkin, such as the SNAPSHOT
@@ -36,8 +37,8 @@ class UtilSingleNotifier implements UtilResubscribeNotifier.UtilResubscribeListe
         this.action = action;
         this.timeoutDuration = timeoutDuration;
 
-        new UtilResubscribeNotifier(client, this);
-        requests = new ConcurrentHashMap<>();
+        this.utilResubscribeNotifier = new UtilResubscribeNotifier(client, this);
+        this.requests = new ConcurrentHashMap<>();
     }
 
     /**
@@ -135,7 +136,13 @@ class UtilSingleNotifier implements UtilResubscribeNotifier.UtilResubscribeListe
             } else {
                 cb.onSingleNotifierResponse(null, null);
             }
+            requests.remove(version.getAsString());
         }
+    }
+
+    void destroy() {
+        this.utilResubscribeNotifier.destroy();
+        this.requests.clear();
     }
 
     @Override

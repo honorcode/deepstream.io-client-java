@@ -6,7 +6,11 @@ plugins {
     id 'com.github.j2objccontrib.j2objcgradle' version '0.6.0-alpha'
 }
 
-task client(type: Jar)
+task client(type: Jar) {
+    baseName = project.name
+    from { configurations.compile.collect { it.isDirectory() ? it : zipTree(it) } }
+    with jar
+}
 
 artifacts {
     archives client
@@ -61,8 +65,7 @@ j2objcConfig {
 }
 
 group 'io.deepstream'
-version '2.1.0'
-
+version '2.2.0'
 
 publishing {
     publications {
@@ -70,7 +73,7 @@ publishing {
             from components.java
             groupId 'io.deepstream'
             artifactId 'deepstream.io-client-java'
-            version '2.1.0'
+            version '2.2.0'
         }
     }
 }
@@ -103,7 +106,7 @@ bintray {
 
         //Optional version descriptor
         version {
-            name = '2.1.0'
+            name = '2.2.0'
             released = new Date()
             gpg {
                 sign = true

@@ -1,3 +1,13 @@
+## [2.2.2] - 2017.07.21
+
+### Fixes
+- Close all ExecutorService's on `DeepstreamClient.close()`
+
+## [2.2.1] - 2017.06.30
+
+### Improvements
+- Better JSON path support for nested arrays and overriding properties during writes
+
 ## [2.2.0] - 2017.05.29
 
 ### Features

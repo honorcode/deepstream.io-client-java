@@ -7,7 +7,7 @@ sourceCompatibility = 1.7
 targetCompatibility = 1.7
 
 group 'io.deepstream'
-version '2.2.0.IRIS'
+version '2.2.2'
 
 repositories {
     mavenCentral()
